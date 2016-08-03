@@ -1,0 +1,13 @@
+[package]
+name = "tokio-line"
+version = "0.1.0"
+authors = ["Carl Lerche <me@carllerche.com>"]
+
+[dependencies]
+log = "*"
+mio = { git = "https://github.com/carllerche/mio", branch = "dev" }
+tokio = { git = "https://github.com/tokio-rs/tokio" }
+futures = "0.1.0"
+
+[dev-dependencies]
+env_logger = "0.3.0"
