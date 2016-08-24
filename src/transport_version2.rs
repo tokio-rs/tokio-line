@@ -12,15 +12,21 @@ impl Parse for Parser {
     type Out = Frame;
 
     fn parse(&mut self, buf: &mut BlockBuf) -> Option<Frame> {
-        // Make sure the data is continuous in memory.
+        // Make sure the data is continuous in memory. BlockBuf is 'faking' a continuous buffer -
+        // if you receive two TCP packets, block buf will keep two allocated memory blocks around -
+        // this is very efficient for reading, but since we call the 'bytes' method below which
+        // requires a single continous block of memory, we need to ask blockbuf to defrag itself. 
         if !buf.is_compact() {
             buf.compact();
         }
 
+        // If our buffer contains a newline...
         if let Some(n) = buf.bytes().unwrap().iter().position(|b| *b == b'\n') {
+            // remove this line and the newline from the buffer.
             let line = buf.shift(n);
             buf.shift(1); // Also remove the '\n'.
 
+            // Turn this data into a UTF string and return it in a Frame.
             return match str::from_utf8(line.buf().bytes()) {
                 Ok(s) => Some(pipeline::Frame::Message(s.to_string())),
                 Err(_) => Some(pipeline::Frame::Error(

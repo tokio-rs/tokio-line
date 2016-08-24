@@ -1,8 +1,6 @@
-extern crate tokio;
-extern crate futures;
-
-// NOCOM(#sirver): only required for version2
 extern crate bytes; 
+extern crate futures;
+extern crate tokio;
 
 #[macro_use]
 extern crate log;
@@ -25,7 +23,9 @@ pub mod transport_version2;
 pub use transport_version2::LineTransport2 as LineTransport;
 pub use transport_version2::new_line_transport;
 
-// NOCOM(#sirver): more docu.
+// Contains the definition of the service that is used both by client and server. It also contains
+// the function showing how to serve a service up.
 pub mod service;
 
+// Contains the client part - connecting and calling a remote service.
 pub mod client;
