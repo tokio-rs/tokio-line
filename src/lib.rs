@@ -252,7 +252,7 @@ pub fn serve<T>(reactor: ReactorHandle,  addr: SocketAddr, new_service: T) -> io
 pub struct Client {
     // The same idea here as `LineService`, except we are mapping it the other
     // direction.
-    inner: pipeline::ClientHandle<Line<TcpStream>, Empty<(), io::Error>, io::Error>,
+    inner: pipeline::Client<String, String, Empty<(), io::Error>, io::Error>,
 }
 
 impl Service for Client {
