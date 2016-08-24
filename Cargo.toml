@@ -5,7 +5,6 @@ authors = ["Carl Lerche <me@carllerche.com>"]
 
 [dependencies]
 log = "0.3.6"
-mio = { git = "https://github.com/carllerche/mio", branch = "dev" }
 tokio = { git = "https://github.com/tokio-rs/tokio" }
 futures = "0.1.0"
 

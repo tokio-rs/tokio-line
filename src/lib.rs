@@ -1,13 +1,16 @@
 extern crate tokio;
-extern crate mio;
+extern crate futures;
 
 #[macro_use]
 extern crate log;
 
-use tokio::{server, NewService};
+use tokio::{server, Service, NewService};
 use tokio::io::{Readiness, Transport};
 use tokio::proto::pipeline;
 use tokio::reactor::ReactorHandle;
+use tokio::tcp::TcpStream;
+use tokio::util::future::Empty;
+use futures::Future;
 use std::{io, mem};
 use std::net::SocketAddr;
 
@@ -61,10 +64,11 @@ impl<T> Readiness for Line<T>
     }
 }
 
-/// This defines the chunks of our transport, i.e. the representation that the 'Service' deals
-/// with. In our case the received and send Frame are the same (Strings with io::Error as
-/// failures), but they could be different (for example HttpRequest for In and HttpResponse for
-/// Out).
+/// This defines the chunks written to our transport, i.e. the representation
+/// that the `Service` deals with. In our case, the received and sent frames
+/// are mostly the same (Strings with io::Error as failures), however they
+/// could also be different (for example HttpRequest for In and HttpResponse
+/// for Out).
 pub type Frame = pipeline::Frame<String, io::Error>;
 
 /// This is a bare-metal implementation of a Transport. We define our frames to be String when
@@ -90,6 +94,15 @@ impl<T> Transport for Line<T>
                 line.truncate(n);
 
                 return String::from_utf8(line)
+                    // For pipelined protocols, the message must be a tuple
+                    // of the message payload to be sent to the Service and
+                    // Option<Sender<T>> where T is the body chunk type.
+                    //
+                    // To support streaming bodies, the transport could create
+                    // a channel pair, include the receiving end in the message
+                    // payload and provide the sending end to the pipeline
+                    // protocol dispatcher which will then proxy any body chunk
+                    // frame to the Sender.
                     .map(|s| Some(pipeline::Frame::Message(s)))
                     .map_err(|_| io::Error::new(io::ErrorKind::Other, "invalid string"));
             }
@@ -189,6 +202,39 @@ impl<T> Transport for Line<T>
     }
 }
 
+/// The Message type with the `Service`. Since the `Line` protocol does not
+/// have any streaming bodies, the body component is hard coded to an empty
+/// stream.
+pub type Message = pipeline::Message<String, Empty<(), io::Error>>;
+
+/// We want to encapsulate `pipeline::Message`. Since the line protocol does
+/// not have any streaming bodies, we can make the service be a request &
+/// response of type String. `LineService` takes the service supplied to
+/// `serve` and adapts it to work with the `proto::pipeline::Server`
+/// requirements.
+struct LineService<T> {
+    inner: T,
+}
+
+impl<T> Service for LineService<T>
+    where T: Service<Req = String, Resp = String, Error = io::Error>,
+{
+    type Req = String;
+    type Resp = pipeline::Message<String, Empty<(), io::Error>>;
+    type Error = io::Error;
+
+    // To make things easier, we are just going to box the future here, however
+    // it is possible to not box the future and refer to `futures::Map`
+    // directly.
+    type Fut = Box<Future<Item = Self::Resp, Error = io::Error>>;
+
+    fn call(&self, req: String) -> Self::Fut {
+        self.inner.call(req)
+            .map(pipeline::Message::WithoutBody)
+            .boxed()
+    }
+}
+
 /// Serve a service up. Secret sauce here is 'NewService', a helper that must be able to create a
 /// new 'Service' for each connection that we receive.
 pub fn serve<T>(reactor: ReactorHandle,  addr: SocketAddr, new_service: T) -> io::Result<()>
@@ -196,16 +242,38 @@ pub fn serve<T>(reactor: ReactorHandle,  addr: SocketAddr, new_service: T) -> io
     try!(server::listen(&reactor, addr, move |stream| {
         // Initialize the pipeline dispatch with the service and the line
         // transport
-        let service = try!(new_service.new_service());
+        let service = LineService { inner: try!(new_service.new_service()) };
         pipeline::Server::new(service, Line::new(stream))
     }));
     Ok(())
 }
 
-/// And the client: We use the same service, but this time we 'connect' instead of 'listen'.
-pub type ClientHandle = pipeline::ClientHandle<String, String, io::Error>;
-pub fn connect(reactor: ReactorHandle, addr: &SocketAddr) -> io::Result<ClientHandle> {
-    let addr = addr.clone();
-    Ok(pipeline::connect(&reactor, addr, |stream| Ok(Line::new(stream))))
+/// And the client handle.
+pub struct Client {
+    // The same idea here as `LineService`, except we are mapping it the other
+    // direction.
+    inner: pipeline::ClientHandle<Line<TcpStream>, Empty<(), io::Error>, io::Error>,
 }
 
+impl Service for Client {
+    type Req = String;
+    type Resp = String;
+    type Error = io::Error;
+    // Again for simplicity, we are just going to box a future
+    type Fut = Box<Future<Item = Self::Resp, Error = io::Error>>;
+
+    fn call(&self, req: String) -> Self::Fut {
+        self.inner.call(pipeline::Message::WithoutBody(req))
+            .boxed()
+    }
+}
+
+pub fn connect(reactor: ReactorHandle, addr: &SocketAddr) -> io::Result<Client> {
+    let addr = addr.clone();
+    let client = pipeline::connect(&reactor, move || {
+        let stream = try!(TcpStream::connect(&addr));
+        Ok(Line::new(stream))
+    });
+
+    Ok(Client { inner: client })
+}
