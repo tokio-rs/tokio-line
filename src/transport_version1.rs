@@ -1,12 +1,6 @@
-use tokio::{server, Service, NewService};
 use tokio::io::{Readiness, Transport};
 use tokio::proto::pipeline;
-use tokio::reactor::ReactorHandle;
-use tokio::tcp::TcpStream;
-use tokio::util::future::Empty;
-use futures::Future;
 use std::{io, mem};
-use std::net::SocketAddr;
 
 /// Line transport. This is a pretty bare implementation of a Transport that is chunked into
 /// individual lines. We have a higher level version in version2: It uses higher level abstractions
@@ -20,25 +14,23 @@ use std::net::SocketAddr;
 ///
 /// The Service only deals in The magic here is that 'inner' must implement 'Readiness' - this allows it to play with Tokio's
 /// reactor.
-pub struct LineVersion1<T> {
+pub struct LineTransport1<T> {
     inner: T,
     read_buffer: Vec<u8>,
     write_buffer: io::Cursor<Vec<u8>>,
 }
 
-impl<T> LineVersion1<T>
+pub fn new_line_transport<T>(inner: T) -> LineTransport1<T> 
     where T: io::Read + io::Write + Readiness,
 {
-    pub fn new(inner: T) -> LineVersion1<T> {
-        LineVersion1 {
-            inner: inner,
-            read_buffer: vec![],
-            write_buffer: io::Cursor::new(vec![]),
-        }
+    LineTransport1 {
+        inner: inner,
+        read_buffer: vec![],
+        write_buffer: io::Cursor::new(vec![]),
     }
 }
 
-impl<T> Readiness for LineVersion1<T>
+impl<T> Readiness for LineTransport1<T>
     where T: Readiness
 {
     // Our transport is ready for reading whenever our 'inner'.
@@ -69,7 +61,7 @@ pub type Frame = pipeline::Frame<String, io::Error>;
 
 /// This is a bare-metal implementation of a Transport. We define our frames to be String when
 /// reading from the wire, that is 'In' and also String when writing to the wire.
-impl<T> Transport for LineVersion1<T>
+impl<T> Transport for LineTransport1<T>
     where T: io::Read + io::Write + Readiness
 {
     type In = Frame;

@@ -4,9 +4,10 @@ version = "0.1.0"
 authors = ["Carl Lerche <me@carllerche.com>"]
 
 [dependencies]
+bytes = { git = "https://github.com/carllerche/bytes" }
+futures = "0.1.0"
 log = "0.3.6"
 tokio = { git = "https://github.com/tokio-rs/tokio" }
-futures = "0.1.0"
 
 [dev-dependencies]
 env_logger = "0.3.0"

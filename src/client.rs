@@ -1,18 +1,15 @@
-use tokio::{server, Service, NewService};
-use tokio::io::{Readiness, Transport};
+use futures::Future;
+use std::io;
+use std::net::SocketAddr;
+use tokio::Service;
 use tokio::proto::pipeline;
 use tokio::reactor::ReactorHandle;
 use tokio::tcp::TcpStream;
 use tokio::util::future::Empty;
-use futures::Future;
-use std::{io, mem};
-use std::net::SocketAddr;
-use Line;
+use {LineTransport, new_line_transport};
 
 /// And the client handle.
 pub struct Client {
-    // The same idea here as `LineService`, except we are mapping it the other
-    // direction.
     inner: pipeline::Client<String, String, Empty<(), io::Error>, io::Error>,
 }
 
@@ -33,7 +30,7 @@ pub fn connect(reactor: ReactorHandle, addr: &SocketAddr) -> io::Result<Client> 
     let addr = addr.clone();
     let client = pipeline::connect(&reactor, move || {
         let stream = try!(TcpStream::connect(&addr));
-        Ok(Line::new(stream))
+        Ok(new_line_transport(stream))
     });
 
     Ok(Client { inner: client })

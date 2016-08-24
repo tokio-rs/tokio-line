@@ -1,13 +1,11 @@
 use tokio::{server, Service, NewService};
-use tokio::io::{Readiness, Transport};
 use tokio::proto::pipeline;
 use tokio::reactor::ReactorHandle;
-use tokio::tcp::TcpStream;
 use tokio::util::future::Empty;
 use futures::Future;
-use std::{io, mem};
+use std::io;
 use std::net::SocketAddr;
-use Line;
+use new_line_transport;
 
 /// We want to encapsulate `pipeline::Message`. Since the line protocol does
 /// not have any streaming bodies, we can make the service be a request &
@@ -45,7 +43,7 @@ pub fn serve<T>(reactor: ReactorHandle,  addr: SocketAddr, new_service: T) -> io
         // Initialize the pipeline dispatch with the service and the line
         // transport
         let service = LineService { inner: try!(new_service.new_service()) };
-        pipeline::Server::new(service, Line::new(stream))
+        pipeline::Server::new(service, new_line_transport(stream))
     }));
     Ok(())
 }
