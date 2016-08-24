@@ -21,11 +21,11 @@ pub fn main() {
     let handle = reactor.handle();
     reactor.spawn();
 
-    // This brings up our server. 
+    // This brings up our server.
     let addr = "127.0.0.1:12345".parse().unwrap();
-    line::serve(
+    line::service::serve(
         handle.clone(),
-        addr, 
+        addr,
         tokio::simple_service(|msg| {
             println!("GOT: {:?}", msg);
             Ok(msg)
@@ -33,11 +33,11 @@ pub fn main() {
         .unwrap();
 
     // Now our client. We use the same reactor as for the server - usually though this would be
-    // done in a separate program most likely on a separate machine. 
-    let client = line::connect(handle, &addr).unwrap();
+    // done in a separate program most likely on a separate machine.
+    let client = line::client::connect(handle, &addr).unwrap();
 
     // The connect call returns us a ClientHandle that allows us to use the 'Service' as a function
-    // - one that returns a future that we can 'await' on. 
+    // - one that returns a future that we can 'await' on.
     let resp = client.call("Hello".to_string());
     println!("RESPONSE: {:?}", await(resp));
 
@@ -45,7 +45,7 @@ pub fn main() {
 }
 
 // Blocks the execution of the current thread until the future is available. Why this isn't in
-// futures-rs, I do not know... 
+// futures-rs, I do not know...
 fn await<T: Future>(f: T) -> Result<T::Item, T::Error> {
     use std::sync::mpsc;
     let (tx, rx) = mpsc::channel();
