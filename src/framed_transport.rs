@@ -4,7 +4,7 @@ use std::str;
 use tokio::io::Readiness;
 use tokio::io::{Parse, Serialize, Framed};
 use tokio::proto::pipeline;
-use transport_version1::Frame;
+use low_level_transport::Frame;
 
 pub struct Parser;
 
@@ -53,9 +53,9 @@ impl Serialize for Serializer {
     }
 }
 
-pub type LineTransport2<T> = Framed<T, Parser, Serializer>;
+pub type FramedLineTransport<T> = Framed<T, Parser, Serializer>;
 
-pub fn new_line_transport<T>(inner: T) -> LineTransport2<T>
+pub fn new_line_transport<T>(inner: T) -> FramedLineTransport<T>
     where T: io::Read + io::Write + Readiness
 {
   Framed::new(inner,

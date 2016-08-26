@@ -6,7 +6,7 @@ use tokio::proto::pipeline;
 use tokio::reactor::ReactorHandle;
 use tokio::tcp::TcpStream;
 use tokio::util::future::Empty;
-use {LineTransport, new_line_transport};
+use new_line_transport;
 
 /// And the client handle.
 pub struct Client {

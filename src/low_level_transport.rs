@@ -14,23 +14,23 @@ use std::{io, mem};
 ///
 /// The Service only deals in The magic here is that 'inner' must implement 'Readiness' - this allows it to play with Tokio's
 /// reactor.
-pub struct LineTransport1<T> {
+pub struct LowLevelLineTransport<T> {
     inner: T,
     read_buffer: Vec<u8>,
     write_buffer: io::Cursor<Vec<u8>>,
 }
 
-pub fn new_line_transport<T>(inner: T) -> LineTransport1<T> 
+pub fn new_line_transport<T>(inner: T) -> LowLevelLineTransport<T> 
     where T: io::Read + io::Write + Readiness,
 {
-    LineTransport1 {
+    LowLevelLineTransport {
         inner: inner,
         read_buffer: vec![],
         write_buffer: io::Cursor::new(vec![]),
     }
 }
 
-impl<T> Readiness for LineTransport1<T>
+impl<T> Readiness for LowLevelLineTransport<T>
     where T: Readiness
 {
     // Our transport is ready for reading whenever our 'inner'.
@@ -61,7 +61,7 @@ pub type Frame = pipeline::Frame<String, io::Error>;
 
 /// This is a bare-metal implementation of a Transport. We define our frames to be String when
 /// reading from the wire, that is 'In' and also String when writing to the wire.
-impl<T> Transport for LineTransport1<T>
+impl<T> Transport for LowLevelLineTransport<T>
     where T: io::Read + io::Write + Readiness
 {
     type In = Frame;

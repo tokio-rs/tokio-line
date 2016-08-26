@@ -11,17 +11,17 @@ extern crate log;
 // actually use. In production code, the second implementation which uses higher level abstractions
 // would be preferable, but this one exposes the core tokio constructs better and has therefore
 // higher educational value. 
-pub mod transport_version1;
-// pub use transport_version1::LineTransport1 as LineTransport;
-// pub use transport_version1::new_line_transport;
+pub mod low_level_transport;
+// pub use low_level_transport::LowLevelLineTransport as LineTransport;
+// pub use low_level_transport::new_line_transport;
 
 // This is the second implementation of the transport. It uses tokio::io::Framed - which works with
 // the concept of a Parser and Serializer and works with higher level abstractions from the bytes
 // crate. Its implementation is much simpler and less error prone, and would be the correct choice
 // in production code. 
-pub mod transport_version2;
-pub use transport_version2::LineTransport2 as LineTransport;
-pub use transport_version2::new_line_transport;
+pub mod framed_transport;
+pub use framed_transport::FramedLineTransport as LineTransport;
+pub use framed_transport::new_line_transport;
 
 // Contains the definition of the service that is used both by client and server. It also contains
 // the function showing how to serve a service up.
