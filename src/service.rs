@@ -1,7 +1,8 @@
-use tokio::{server, Service, NewService};
-use tokio::proto::pipeline;
-use tokio::reactor::ReactorHandle;
-use tokio::util::future::Empty;
+use proto::{server, NewService};
+use proto::proto::pipeline;
+use tokio_service::Service;
+use tokio::LoopHandle;
+use empty::Empty;
 use futures::Future;
 use std::io;
 use std::net::SocketAddr;
@@ -26,7 +27,7 @@ impl<T> Service for LineService<T>
     // To make things easier, we are just going to box the future here, however
     // it is possible to not box the future and refer to `futures::Map`
     // directly.
-    type Fut = Box<Future<Item = Self::Resp, Error = io::Error>>;
+    type Fut = Box<Future<Item = Self::Resp, Error = io::Error> + Send>;
 
     fn call(&self, req: String) -> Self::Fut {
         self.inner.call(req)
@@ -37,13 +38,14 @@ impl<T> Service for LineService<T>
 
 /// Serve a service up. Secret sauce here is 'NewService', a helper that must be able to create a
 /// new 'Service' for each connection that we receive.
-pub fn serve<T>(reactor: ReactorHandle,  addr: SocketAddr, new_service: T) -> io::Result<()>
-    where T: NewService<Req = String, Resp = String, Error = io::Error> + Send + 'static {
-    try!(server::listen(&reactor, addr, move |stream| {
+pub fn serve<T>(loop_handle: LoopHandle,  addr: SocketAddr, new_service: T)
+        where T: NewService<Req = String, Resp = String, Error = io::Error> + Send + 'static
+{
+    // Spawn the server on the given loop
+    server::listen(loop_handle, addr, move |stream| {
         // Initialize the pipeline dispatch with the service and the line
         // transport
         let service = LineService { inner: try!(new_service.new_service()) };
         pipeline::Server::new(service, new_line_transport(stream))
-    }));
-    Ok(())
+    }).forget();
 }

@@ -1,6 +1,14 @@
 extern crate bytes; 
+// The `futures` crate contains the future & stream implementations as well
+// as combinators to manipulate the async values.
 extern crate futures;
-extern crate tokio;
+// The `tokio_core` crate contains the async IO runtime.
+extern crate tokio_core as tokio;
+// The `tokio_proto` crate contains the abstractions and building blocks for
+// quickly implementing a protocol client or server.
+extern crate tokio_proto as proto;
+// The `Service` trait
+extern crate tokio_service;
 
 #[macro_use]
 extern crate log;
@@ -29,3 +37,6 @@ pub mod service;
 
 // Contains the client part - connecting and calling a remote service.
 pub mod client;
+
+// An empty stream. This will hopefully get moved into another lib.
+mod empty;

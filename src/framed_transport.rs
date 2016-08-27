@@ -1,9 +1,9 @@
 use bytes::{Buf, BlockBuf, MutBuf};
 use std::io;
 use std::str;
-use tokio::io::Readiness;
-use tokio::io::{Parse, Serialize, Framed};
-use tokio::proto::pipeline;
+use proto::io::Readiness;
+use proto::io::{Parse, Serialize, Framed};
+use proto::proto::pipeline;
 use low_level_transport::Frame;
 
 pub struct Parser;
