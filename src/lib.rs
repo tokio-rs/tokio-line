@@ -1,6 +1,7 @@
-extern crate bytes; 
+extern crate bytes;
 extern crate futures;
-extern crate tokio;
+extern crate tokio_core;
+extern crate tokio_proto;
 
 #[macro_use]
 extern crate log;
@@ -10,7 +11,7 @@ extern crate log;
 // partial messages that come from the socket together into full frames that our service can
 // actually use. In production code, the second implementation which uses higher level abstractions
 // would be preferable, but this one exposes the core tokio constructs better and has therefore
-// higher educational value. 
+// higher educational value.
 pub mod low_level_transport;
 // pub use low_level_transport::LowLevelLineTransport as LineTransport;
 // pub use low_level_transport::new_line_transport;
@@ -18,7 +19,7 @@ pub mod low_level_transport;
 // This is the second implementation of the transport. It uses tokio::io::Framed - which works with
 // the concept of a Parser and Serializer and works with higher level abstractions from the bytes
 // crate. Its implementation is much simpler and less error prone, and would be the correct choice
-// in production code. 
+// in production code.
 pub mod framed_transport;
 pub use framed_transport::FramedLineTransport as LineTransport;
 pub use framed_transport::new_line_transport;
