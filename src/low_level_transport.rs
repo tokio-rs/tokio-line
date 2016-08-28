@@ -1,10 +1,10 @@
-use tokio::io::{Readiness, Transport};
-use tokio::proto::pipeline;
+use tokio_proto::io::{Readiness, Transport};
+use tokio_proto::proto::pipeline;
 use std::{io, mem};
 
 /// Line transport. This is a pretty bare implementation of a Transport that is chunked into
 /// individual lines. We have a higher level version in version2: It uses higher level abstractions
-/// to make the job of parsing a framed transport simpler. 
+/// to make the job of parsing a framed transport simpler.
 /// The job of a transport is twofold:
 ///
 /// 1) take the bytes that arrive on our 'inner' (e.g. socket) and chunk them down into frames as
@@ -20,7 +20,7 @@ pub struct LowLevelLineTransport<T> {
     write_buffer: io::Cursor<Vec<u8>>,
 }
 
-pub fn new_line_transport<T>(inner: T) -> LowLevelLineTransport<T> 
+pub fn new_line_transport<T>(inner: T) -> LowLevelLineTransport<T>
     where T: io::Read + io::Write + Readiness,
 {
     LowLevelLineTransport {
@@ -96,7 +96,7 @@ impl<T> Transport for LowLevelLineTransport<T>
             }
 
             // There was no full line in the input buffer - let's see if anything is on our
-            // 'inner'. 
+            // 'inner'.
             match self.inner.read_to_end(&mut self.read_buffer) {
                 Ok(0) => {
                     // The other side hang up - this transport is all done.

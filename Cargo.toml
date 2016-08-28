@@ -5,9 +5,10 @@ authors = ["Carl Lerche <me@carllerche.com>"]
 
 [dependencies]
 bytes = { git = "https://github.com/carllerche/bytes" }
-futures = "0.1.0"
+futures = { git = "https://github.com/alexcrichton/futures-rs" }
 log = "0.3.6"
-tokio = { git = "https://github.com/tokio-rs/tokio" }
+tokio-proto = { git = "https://github.com/tokio-rs/tokio-proto" }
+tokio-core = { git = "https://github.com/tokio-rs/tokio-core" }
 
 [dev-dependencies]
 env_logger = "0.3.0"
