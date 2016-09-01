@@ -39,13 +39,18 @@ impl<T> Service for LineService<T>
 /// Serve a service up. Secret sauce here is 'NewService', a helper that must be able to create a
 /// new 'Service' for each connection that we receive.
 pub fn serve<T>(loop_handle: LoopHandle,  addr: SocketAddr, new_service: T)
-        where T: NewService<Req = String, Resp = String, Error = io::Error> + Send + 'static
+    where T: NewService<Req = String, Resp = String, Error = io::Error> + Send + 'static
 {
     // Spawn the server on the given loop
-    server::listen(loop_handle, addr, move |stream| {
-        // Initialize the pipeline dispatch with the service and the line
-        // transport
-        let service = LineService { inner: try!(new_service.new_service()) };
-        pipeline::Server::new(service, new_line_transport(stream))
-    }).forget();
+    loop_handle.clone().spawn(move |_| {
+        server::listen(loop_handle, addr, move |stream| {
+            // Initialize the pipeline dispatch with the service and the line
+            // transport
+            let service = LineService { inner: try!(new_service.new_service()) };
+            pipeline::Server::new(service, new_line_transport(stream))
+        }).then(|r| {
+            r.expect("failed to listen");
+            Ok(())
+        })
+    });
 }
