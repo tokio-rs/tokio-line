@@ -2,7 +2,7 @@ use futures::Future;
 use std::io;
 use std::net::SocketAddr;
 use tokio_service::Service;
-use proto::proto::pipeline;
+use proto::pipeline;
 use tokio::LoopHandle;
 use tokio::io::IoFuture;
 use empty::Empty;

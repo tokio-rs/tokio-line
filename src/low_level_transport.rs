@@ -1,5 +1,5 @@
 use proto::io::{Readiness, Transport};
-use proto::proto::pipeline;
+use proto::pipeline;
 use std::{io, mem};
 
 /// Line transport. This is a pretty bare implementation of a Transport that is chunked into

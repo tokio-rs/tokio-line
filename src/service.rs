@@ -1,5 +1,5 @@
 use proto::{server, NewService};
-use proto::proto::pipeline;
+use proto::pipeline;
 use tokio_service::Service;
 use tokio::LoopHandle;
 use empty::Empty;

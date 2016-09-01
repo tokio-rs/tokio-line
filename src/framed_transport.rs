@@ -3,7 +3,7 @@ use std::io;
 use std::str;
 use proto::io::Readiness;
 use proto::io::{Parse, Serialize, Framed};
-use proto::proto::pipeline;
+use proto::pipeline;
 use low_level_transport::Frame;
 
 pub struct Parser;
