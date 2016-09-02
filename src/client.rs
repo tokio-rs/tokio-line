@@ -5,7 +5,7 @@ use tokio_service::Service;
 use proto::pipeline;
 use tokio::LoopHandle;
 use tokio::io::IoFuture;
-use empty::Empty;
+use futures::stream::Empty;
 use new_line_transport;
 use std::cell::RefCell;
 
