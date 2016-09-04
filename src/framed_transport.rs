@@ -1,6 +1,6 @@
-use bytes::{Buf, BlockBuf, MutBuf};
-use std::io;
-use std::str;
+use bytes::{self, Buf, BlockBuf, MutBuf};
+use std::{io, str};
+use std::fmt::Write;
 use proto::io::Readiness;
 use proto::io::{Parse, Serialize, Framed};
 use proto::pipeline;
@@ -43,12 +43,21 @@ impl Serialize for Serializer {
     type In = Frame;
 
     fn serialize(&mut self, frame: Frame, buf: &mut BlockBuf) {
+        use proto::pipeline::Frame::*;
+
         match frame {
-            pipeline::Frame::Message(text) => {
+            Message(text) => {
                 buf.write_slice(&text.as_bytes());
                 buf.write_slice(&['\n' as u8]);
             }
-            _ => unimplemented!(),
+            Error(e) => {
+                let _ = write!(bytes::Fmt(buf), "[ERROR] {}\n", e);
+            }
+            MessageWithBody(..) | Body(..) => {
+                // Our Line protocol does not support streaming bodies
+                unreachable!();
+            }
+            Done => {}
         }
     }
 }
