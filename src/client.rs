@@ -19,7 +19,7 @@ impl Service for Client {
     type Resp = String;
     type Error = io::Error;
     // Again for simplicity, we are just going to box a future
-    type Fut = Box<Future<Item = Self::Resp, Error = io::Error> + Send>;
+    type Fut = Box<Future<Item = Self::Resp, Error = io::Error>>;
 
     fn call(&self, req: String) -> Self::Fut {
         self.inner.call(pipeline::Message::WithoutBody(req))

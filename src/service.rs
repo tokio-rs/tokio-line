@@ -19,6 +19,7 @@ struct LineService<T> {
 
 impl<T> Service for LineService<T>
     where T: Service<Req = String, Resp = String, Error = io::Error>,
+          T::Fut: 'static,
 {
     type Req = String;
     type Resp = pipeline::Message<String, Empty<(), io::Error>>;
@@ -27,19 +28,18 @@ impl<T> Service for LineService<T>
     // To make things easier, we are just going to box the future here, however
     // it is possible to not box the future and refer to `futures::Map`
     // directly.
-    type Fut = Box<Future<Item = Self::Resp, Error = io::Error> + Send>;
+    type Fut = Box<Future<Item = Self::Resp, Error = io::Error>>;
 
     fn call(&self, req: String) -> Self::Fut {
-        self.inner.call(req)
-            .map(pipeline::Message::WithoutBody)
-            .boxed()
+        Box::new(self.inner.call(req)
+            .map(pipeline::Message::WithoutBody))
     }
 }
 
 /// Serve a service up. Secret sauce here is 'NewService', a helper that must be able to create a
 /// new 'Service' for each connection that we receive.
 pub fn serve<T>(loop_handle: LoopHandle,  addr: SocketAddr, new_service: T)
-    where T: NewService<Req = String, Resp = String, Error = io::Error> + Send + 'static
+    where T: NewService<Req = String, Resp = String, Error = io::Error> + Send + 'static,
 {
     // Spawn the server on the given loop
     loop_handle.clone().spawn(move |_| {
