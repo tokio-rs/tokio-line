@@ -3,8 +3,8 @@ use std::io;
 use std::net::SocketAddr;
 use tokio_service::Service;
 use proto::pipeline;
-use tokio::LoopHandle;
-use tokio::io::IoFuture;
+use tokio::reactor::Handle;
+use tokio::net::TcpStream;
 use futures::stream::Empty;
 use new_line_transport;
 use std::cell::RefCell;
@@ -27,18 +27,18 @@ impl Service for Client {
     }
 }
 
-pub fn connect(loop_handle: LoopHandle, addr: &SocketAddr) -> IoFuture<Client> {
-    let h2 = loop_handle.clone();
-    loop_handle.tcp_connect(addr)
+pub fn connect(handle: Handle, addr: &SocketAddr)
+               -> Box<Future<Item=Client, Error=io::Error>> {
+    Box::new(TcpStream::connect(addr, &handle)
         .and_then(move |tcp| {
             let tcp = RefCell::new(Some(tcp));
-            let c = pipeline::connect(h2, move || {
+            let c = try!(pipeline::connect(&handle, move || {
                 // Not an ideal strategy, but fixing this requires some
                 // upstream changes.
                 let tcp = tcp.borrow_mut().take().unwrap();
                 Ok(new_line_transport(tcp))
-            });
+            }));
 
             Ok(Client { inner: c })
-        }).boxed()
+        }))
 }

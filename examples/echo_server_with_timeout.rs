@@ -18,7 +18,7 @@ extern crate rand;
 extern crate env_logger;
 
 use futures::Future;
-use tokio::Loop;
+use tokio::reactor::Core;
 use timer::Timer;
 use rand::Rng;
 use std::io;
@@ -27,7 +27,7 @@ use std::time::Duration;
 pub fn main() {
     env_logger::init().unwrap();
 
-    let mut lp = Loop::new().unwrap();
+    let mut lp = Core::new().unwrap();
     let timer = Timer::default();
 
     // The address to bind the listener socket to
@@ -56,7 +56,7 @@ pub fn main() {
         Duration::from_millis(200));
 
     // Start the server
-    line::service::serve(lp.handle(), addr, service);
+    line::service::serve(&lp.handle(), addr, service).unwrap();
 
     println!("Echo server running on {}", addr);
 
