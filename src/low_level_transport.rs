@@ -1,4 +1,6 @@
-use proto::io::{Readiness, Transport};
+use futures::Async;
+use tokio::io::Io;
+use proto::Transport;
 use proto::pipeline;
 use std::{io, mem};
 
@@ -21,7 +23,7 @@ pub struct LowLevelLineTransport<T> {
 }
 
 pub fn new_line_transport<T>(inner: T) -> LowLevelLineTransport<T> 
-    where T: io::Read + io::Write + Readiness,
+    where T: Io,
 {
     LowLevelLineTransport {
         inner: inner,
@@ -30,42 +32,25 @@ pub fn new_line_transport<T>(inner: T) -> LowLevelLineTransport<T>
     }
 }
 
-impl<T> Readiness for LowLevelLineTransport<T>
-    where T: Readiness
-{
-    // Our transport is ready for reading whenever our 'inner'.
-    fn is_readable(&self) -> bool {
-        self.inner.is_readable()
-    }
-
-    // And ready for writing whenever inner is. Below we make sure that we always write everything
-    // out to 'inner' whenever it is ready, so our writing buf should always be empty when 'inner'
-    // is ready for writing and non-empty if it isn't.
-    fn is_writable(&self) -> bool {
-        let is_writable = self.write_buffer.position() == self.write_buffer.get_ref().len() as u64;
-
-        if !is_writable {
-            assert!(!self.inner.is_writable());
-        }
-
-        is_writable
-    }
-}
-
 /// This defines the chunks written to our transport, i.e. the representation
 /// that the `Service` deals with. In our case, the received and sent frames
 /// are mostly the same (Strings with io::Error as failures), however they
 /// could also be different (for example HttpRequest for In and HttpResponse
 /// for Out).
-pub type Frame = pipeline::Frame<String, io::Error>;
+pub type Frame = pipeline::Frame<String, (), io::Error>;
 
 /// This is a bare-metal implementation of a Transport. We define our frames to be String when
 /// reading from the wire, that is 'In' and also String when writing to the wire.
 impl<T> Transport for LowLevelLineTransport<T>
-    where T: io::Read + io::Write + Readiness
+    where T: Io
 {
     type In = Frame;
     type Out = Frame;
+
+    // Our transport is ready for reading whenever our 'inner'.
+    fn poll_read(&mut self) -> Async<()> {
+        self.inner.poll_read()
+    }
 
     /// Read a message from the `Transport`
     fn read(&mut self) -> io::Result<Option<Frame>> {
@@ -119,6 +104,23 @@ impl<T> Transport for LowLevelLineTransport<T>
                     return Err(e)
                 }
             }
+        }
+    }
+
+    // And ready for writing whenever inner is. Below we make sure that we always write everything
+    // out to 'inner' whenever it is ready, so our writing buf should always be empty when 'inner'
+    // is ready for writing and non-empty if it isn't.
+    fn poll_write(&mut self) -> Async<()> {
+        let is_writable = self.write_buffer.position() == self.write_buffer.get_ref().len() as u64;
+
+        if !is_writable {
+            assert!(!self.inner.poll_write().is_ready());
+        }
+
+        if is_writable {
+            Async::Ready(())
+        } else {
+            Async::NotReady
         }
     }
 

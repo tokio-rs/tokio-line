@@ -1,9 +1,8 @@
 use bytes::{self, Buf, BlockBuf, MutBuf};
 use std::{io, str};
 use std::fmt::Write;
-use proto::io::Readiness;
-use proto::io::{Parse, Serialize, Framed};
-use proto::pipeline;
+use tokio::io::Io;
+use proto::{pipeline, Parse, Serialize, Framed};
 use low_level_transport::Frame;
 
 pub struct Parser;
@@ -65,7 +64,7 @@ impl Serialize for Serializer {
 pub type FramedLineTransport<T> = Framed<T, Parser, Serializer>;
 
 pub fn new_line_transport<T>(inner: T) -> FramedLineTransport<T>
-    where T: io::Read + io::Write + Readiness
+    where T: Io,
 {
   Framed::new(inner,
               Parser,
