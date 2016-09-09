@@ -1,6 +1,5 @@
-use proto::{server, NewService};
-use proto::pipeline;
-use tokio_service::Service;
+use proto::{pipeline, server};
+use tokio_service::{Service, NewService};
 use tokio::reactor::Handle;
 use futures::{Async, Future};
 use futures::stream::Empty;

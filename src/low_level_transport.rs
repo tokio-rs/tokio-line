@@ -1,6 +1,5 @@
-use futures::Async;
-use tokio::io::Io;
-use proto::Transport;
+use futures::{Async, Poll};
+use tokio::io::{Io, FramedIo};
 use proto::pipeline;
 use std::{io, mem};
 
@@ -41,7 +40,7 @@ pub type Frame = pipeline::Frame<String, (), io::Error>;
 
 /// This is a bare-metal implementation of a Transport. We define our frames to be String when
 /// reading from the wire, that is 'In' and also String when writing to the wire.
-impl<T> Transport for LowLevelLineTransport<T>
+impl<T> FramedIo for LowLevelLineTransport<T>
     where T: Io
 {
     type In = Frame;
@@ -53,7 +52,7 @@ impl<T> Transport for LowLevelLineTransport<T>
     }
 
     /// Read a message from the `Transport`
-    fn read(&mut self) -> io::Result<Option<Frame>> {
+    fn read(&mut self) -> Poll<Frame, io::Error> {
         loop {
             // First, we check if our read buffer contains a new line - if that is the case, we
             // have one new Frame for the Service to consume. We remove the line from the input
@@ -76,7 +75,7 @@ impl<T> Transport for LowLevelLineTransport<T>
                     // payload and provide the sending end to the pipeline
                     // protocol dispatcher which will then proxy any body chunk
                     // frame to the Sender.
-                    .map(|s| Some(pipeline::Frame::Message(s)))
+                    .map(|s| Async::Ready(pipeline::Frame::Message(s)))
                     .map_err(|_| io::Error::new(io::ErrorKind::Other, "invalid string"));
             }
 
@@ -86,7 +85,7 @@ impl<T> Transport for LowLevelLineTransport<T>
                 Ok(0) => {
                     // The other side hang up - this transport is all done.
                     // TODO(sirver): The use case of this is not entirely clear to me.
-                    return Ok(Some(pipeline::Frame::Done));
+                    return Ok(Async::Ready(pipeline::Frame::Done));
                 },
                 Ok(_) => {
                     // Some data was read. The next round in the loop will try to parse it into a
@@ -97,7 +96,7 @@ impl<T> Transport for LowLevelLineTransport<T>
                     // there is right now no full frame available. It will try again the next time
                     // our source signals readiness to read.
                     if e.kind() == io::ErrorKind::WouldBlock {
-                        return Ok(None);
+                        return Ok(Async::NotReady);
                     }
 
                     // Just a regular error - pass upwards for handling.
@@ -126,7 +125,7 @@ impl<T> Transport for LowLevelLineTransport<T>
 
     /// Write a message to the `Transport`. This turns the frame we get into a byte string and adds
     /// a newline. It then immediately gets flushed out to 'inner'.
-    fn write(&mut self, req: Frame) -> io::Result<Option<()>> {
+    fn write(&mut self, req: Frame) -> Poll<(), io::Error> {
         match req {
             pipeline::Frame::Message(req) => {
                 trace!("writing value; val={:?}", req);
@@ -151,7 +150,7 @@ impl<T> Transport for LowLevelLineTransport<T>
     /// Flush pending writes to the socket. This tries to write as much as possible of the data we
     /// have in the write buffer to 'inner'. Since this might block - because inner is not ready,
     /// we have to keep track of what we wrote.
-    fn flush(&mut self) -> io::Result<Option<()>> {
+    fn flush(&mut self) -> Poll<(), io::Error> {
         trace!("flushing transport");
         loop {
             // Making the borrow checker happy
@@ -162,7 +161,7 @@ impl<T> Transport for LowLevelLineTransport<T>
 
                     if buf.is_empty() {
                         trace!("transport flushed");
-                        return Ok(Some(()));
+                        return Ok(Async::Ready(()));
                     }
 
                     trace!("writing; remaining={:?}", buf);
@@ -181,7 +180,7 @@ impl<T> Transport for LowLevelLineTransport<T>
                 Err(e) => {
                     if e.kind() == io::ErrorKind::WouldBlock {
                         trace!("transport flush would block");
-                        return Ok(None);
+                        return Ok(Async::NotReady);
                     }
 
                     trace!("transport flush error; err={:?}", e);
