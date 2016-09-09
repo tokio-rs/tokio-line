@@ -37,8 +37,6 @@ pub fn main() {
     let service = {
         let timer = timer.clone();
         service::simple_service(move |msg| {
-            println!("GOT: {:?}", msg);
-
             // Sleep for a random duration that could be greater than the
             // alloted timeout
             let mut rng = rand::thread_rng();
@@ -54,6 +52,9 @@ pub fn main() {
     let service = middleware::Timeout::new(
         service, timer,
         Duration::from_millis(200));
+
+    // Decorate the service with the Log middleware
+    let service = middleware::Log::new(service);
 
     // Start the server
     line::service::serve(&lp.handle(), addr, service).unwrap();
