@@ -1,4 +1,4 @@
-use futures::Future;
+use futures::{Async, Future};
 use std::io;
 use std::net::SocketAddr;
 use tokio_service::Service;
@@ -15,15 +15,19 @@ pub struct Client {
 }
 
 impl Service for Client {
-    type Req = String;
-    type Resp = String;
+    type Request = String;
+    type Response = String;
     type Error = io::Error;
     // Again for simplicity, we are just going to box a future
-    type Fut = Box<Future<Item = Self::Resp, Error = io::Error>>;
+    type Future = Box<Future<Item = Self::Response, Error = io::Error>>;
 
-    fn call(&self, req: String) -> Self::Fut {
+    fn call(&self, req: String) -> Self::Future {
         self.inner.call(pipeline::Message::WithoutBody(req))
             .boxed()
+    }
+
+    fn poll_ready(&self) -> Async<()> {
+        Async::Ready(())
     }
 }
 
