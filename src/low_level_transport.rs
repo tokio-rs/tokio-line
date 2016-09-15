@@ -4,7 +4,7 @@ use proto::pipeline;
 use std::{io, mem};
 
 /// Line transport. This is a pretty bare implementation of a Transport that is chunked into
-/// individual lines. We have a higher level version in version2: It uses higher level abstractions
+/// individual lines. We have a higher level version in framed_transport.rs: It uses higher level abstractions
 /// to make the job of parsing a framed transport simpler. 
 /// The job of a transport is twofold:
 ///
@@ -33,7 +33,7 @@ pub fn new_line_transport<T>(inner: T) -> LowLevelLineTransport<T>
 
 /// This defines the chunks written to our transport, i.e. the representation
 /// that the `Service` deals with. In our case, the received and sent frames
-/// are mostly the same (Strings with io::Error as failures), however they
+/// are the same (Strings with io::Error as failures), however they
 /// could also be different (for example HttpRequest for In and HttpResponse
 /// for Out).
 pub type Frame = pipeline::Frame<String, (), io::Error>;
@@ -46,7 +46,7 @@ impl<T> FramedIo for LowLevelLineTransport<T>
     type In = Frame;
     type Out = Frame;
 
-    // Our transport is ready for reading whenever our 'inner'.
+    // Our transport is ready for reading whenever our 'inner' is.
     fn poll_read(&mut self) -> Async<()> {
         self.inner.poll_read()
     }
@@ -107,7 +107,7 @@ impl<T> FramedIo for LowLevelLineTransport<T>
     }
 
     // And ready for writing whenever inner is. Below we make sure that we always write everything
-    // out to 'inner' whenever it is ready, so our writing buf should always be empty when 'inner'
+    // out to 'inner' whenever it is ready, so our writing buffer should always be empty when 'inner'
     // is ready for writing and non-empty if it isn't.
     fn poll_write(&mut self) -> Async<()> {
         let is_writable = self.write_buffer.position() == self.write_buffer.get_ref().len() as u64;
