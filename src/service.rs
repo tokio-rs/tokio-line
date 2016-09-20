@@ -31,7 +31,13 @@ impl<T> Service for LineService<T>
 
     fn call(&self, req: String) -> Self::Future {
         Box::new(self.inner.call(req)
-            .map(proto::Message::WithoutBody))
+            .and_then(|resp| {
+                if resp.chars().find(|&c| c == '\n').is_some() {
+                    Err(io::Error::new(io::ErrorKind::InvalidInput, "message contained new line"))
+                } else {
+                    Ok(proto::Message::WithoutBody(resp))
+                }
+            }))
     }
 
     fn poll_ready(&self) -> Async<()> {

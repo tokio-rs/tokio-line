@@ -1,4 +1,4 @@
-use futures::{Async, Future};
+use futures::{self, Async, Future};
 use std::io;
 use std::net::SocketAddr;
 use tokio_service::Service;
@@ -21,6 +21,12 @@ impl Service for Client {
     type Future = Box<Future<Item = Self::Response, Error = io::Error>>;
 
     fn call(&self, req: String) -> Self::Future {
+        // Make sure that the request does not include any new lines
+        if req.chars().find(|&c| c == '\n').is_some() {
+            let err = io::Error::new(io::ErrorKind::InvalidInput, "message contained new line");
+            return Box::new(futures::done(Err(err)))
+        }
+
         self.inner.call(proto::Message::WithoutBody(req))
             .boxed()
     }
