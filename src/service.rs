@@ -1,4 +1,4 @@
-use proto::{pipeline, server};
+use proto::{self, pipeline, server};
 use tokio_service::{Service, NewService};
 use tokio::reactor::Handle;
 use futures::{Async, Future};
@@ -7,7 +7,7 @@ use std::io;
 use std::net::SocketAddr;
 use new_line_transport;
 
-/// We want to encapsulate `pipeline::Message`. Since the line protocol does
+/// We want to encapsulate `proto::Message`. Since the line protocol does
 /// not have any streaming bodies, we can make the service be a request &
 /// response of type String. `LineService` takes the service supplied to
 /// `serve` and adapts it to work with the `proto::pipeline::Server`
@@ -21,7 +21,7 @@ impl<T> Service for LineService<T>
           T::Future: 'static,
 {
     type Request = String;
-    type Response = pipeline::Message<String, Empty<(), io::Error>>;
+    type Response = proto::Message<String, Empty<(), io::Error>>;
     type Error = io::Error;
 
     // To make things easier, we are just going to box the future here, however
@@ -31,7 +31,7 @@ impl<T> Service for LineService<T>
 
     fn call(&self, req: String) -> Self::Future {
         Box::new(self.inner.call(req)
-            .map(pipeline::Message::WithoutBody))
+            .map(proto::Message::WithoutBody))
     }
 
     fn poll_ready(&self) -> Async<()> {

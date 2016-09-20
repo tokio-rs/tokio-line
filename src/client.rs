@@ -2,12 +2,11 @@ use futures::{Async, Future};
 use std::io;
 use std::net::SocketAddr;
 use tokio_service::Service;
-use proto::pipeline;
+use proto::{self, pipeline};
 use tokio::reactor::Handle;
 use tokio::net::TcpStream;
 use futures::stream::Empty;
 use new_line_transport;
-use std::cell::RefCell;
 
 /// And the client handle.
 pub struct Client {
@@ -22,7 +21,7 @@ impl Service for Client {
     type Future = Box<Future<Item = Self::Response, Error = io::Error>>;
 
     fn call(&self, req: String) -> Self::Future {
-        self.inner.call(pipeline::Message::WithoutBody(req))
+        self.inner.call(proto::Message::WithoutBody(req))
             .boxed()
     }
 
@@ -33,16 +32,17 @@ impl Service for Client {
 
 pub fn connect(handle: Handle, addr: &SocketAddr)
                -> Box<Future<Item=Client, Error=io::Error>> {
-    Box::new(TcpStream::connect(addr, &handle)
-        .and_then(move |tcp| {
-            let tcp = RefCell::new(Some(tcp));
-            let c = try!(pipeline::connect(&handle, move || {
-                // Not an ideal strategy, but fixing this requires some
-                // upstream changes.
-                let tcp = tcp.borrow_mut().take().unwrap();
-                Ok(new_line_transport(tcp))
-            }));
 
-            Ok(Client { inner: c })
-        }))
+    let addr = addr.clone();
+    let h = handle.clone();
+
+    let new_transport = move || {
+        TcpStream::connect(&addr, &h).map(new_line_transport)
+    };
+
+    // Connect the client
+    let client = pipeline::connect(new_transport, &handle);
+    let client = client.map(|inner| Client { inner: inner });
+
+    Box::new(client)
 }
