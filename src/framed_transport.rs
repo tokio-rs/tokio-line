@@ -34,6 +34,11 @@ impl Parse for Parser {
         }
         None
     }
+
+    fn done(&mut self, buf: &mut BlockBuf) -> Option<Frame> {
+        assert!(buf.is_empty());
+        Some(pipeline::Frame::Done)
+    }
 }
 
 pub struct Serializer;
