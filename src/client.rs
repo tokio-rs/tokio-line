@@ -10,7 +10,7 @@ use new_line_transport;
 
 /// And the client handle.
 pub struct Client {
-    inner: pipeline::Client<String, String, Empty<(), io::Error>, io::Error>,
+    inner: proto::Client<String, String, Empty<(), io::Error>, io::Error>,
 }
 
 impl Service for Client {
@@ -36,9 +36,7 @@ impl Service for Client {
     }
 }
 
-pub fn connect(handle: Handle, addr: &SocketAddr)
-               -> Box<Future<Item=Client, Error=io::Error>> {
-
+pub fn connect(handle: Handle, addr: &SocketAddr) -> Client {
     let addr = addr.clone();
     let h = handle.clone();
 
@@ -48,7 +46,5 @@ pub fn connect(handle: Handle, addr: &SocketAddr)
 
     // Connect the client
     let client = pipeline::connect(new_transport, &handle);
-    let client = client.map(|inner| Client { inner: inner });
-
-    Box::new(client)
+    Client { inner: client }
 }

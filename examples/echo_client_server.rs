@@ -26,7 +26,6 @@ pub fn main() {
     // Now our client. We use the same reactor as for the server - usually though this would be
     // done in a separate program most likely on a separate machine.
     let client = line::client::connect(core.handle(), &addr);
-    let client = core.run(client).unwrap();
 
     // The connect call returns us a ClientHandle that allows us to use the 'Service' as a function
     // - one that returns a future that we can 'await' on.
