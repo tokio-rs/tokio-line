@@ -1,4 +1,5 @@
-use bytes::{self, Buf, BlockBuf, MutBuf};
+use bytes::{Buf, MutBuf};
+use bytes::buf::{BlockBuf, Fmt};
 use std::{io, str};
 use std::fmt::Write;
 use tokio::io::Io;
@@ -55,7 +56,7 @@ impl Serialize for Serializer {
                 buf.write_slice(&['\n' as u8]);
             }
             Error(e) => {
-                let _ = write!(bytes::Fmt(buf), "[ERROR] {}\n", e);
+                let _ = write!(Fmt(buf), "[ERROR] {}\n", e);
             }
             MessageWithBody(..) | Body(..) => {
                 // Our Line protocol does not support streaming bodies
