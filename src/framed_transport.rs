@@ -1,80 +1,55 @@
-use bytes::{Buf, MutBuf};
-use bytes::buf::{BlockBuf, Fmt};
-use std::{io, str};
-use std::fmt::Write;
 use tokio::io::Io;
-use proto::{pipeline, Parse, Serialize, Framed};
-use low_level_transport::Frame;
+use tokio::easy::{EasyFramed, EasyBuf, Parse, Serialize};
+use futures::{Async, Poll};
+use std::{io, str};
 
 pub struct Parser;
 
 impl Parse for Parser {
-    type Out = Frame;
+    type Out = String;
 
-    fn parse(&mut self, buf: &mut BlockBuf) -> Option<Frame> {
-        // Make sure the data is continuous in memory. BlockBuf is 'faking' a continuous buffer -
-        // if you receive two TCP packets, block buf will keep two allocated memory blocks around -
-        // this is very efficient for reading, but since we call the 'bytes' method below which
-        // requires a single continous block of memory, we need to ask blockbuf to defrag itself. 
-        if !buf.is_compact() {
-            buf.compact();
-        }
-
+    fn parse(&mut self, buf: &mut EasyBuf) -> Poll<Self::Out, io::Error> {
         // If our buffer contains a newline...
-        if let Some(n) = buf.bytes().unwrap().iter().position(|b| *b == b'\n') {
+        if let Some(n) = buf.as_ref().iter().position(|b| *b == b'\n') {
             // remove this line and the newline from the buffer.
-            let line = buf.shift(n);
-            buf.shift(1); // Also remove the '\n'.
+            let line = buf.drain_to(n);
+            buf.drain_to(1); // Also remove the '\n'.
 
             // Turn this data into a UTF string and return it in a Frame.
-            return match str::from_utf8(line.buf().bytes()) {
-                Ok(s) => Some(pipeline::Frame::Message(s.to_string())),
-                Err(_) => Some(pipeline::Frame::Error(
-                        io::Error::new(io::ErrorKind::Other, "invalid string"))),
+            return match str::from_utf8(line.as_ref()) {
+                Ok(s) => Ok(Async::Ready(s.to_string())),
+                Err(_) => Err(io::Error::new(io::ErrorKind::Other, "invalid string")),
             }
         }
-        None
+
+        Ok(Async::NotReady)
     }
 
-    fn done(&mut self, buf: &mut BlockBuf) -> Option<Frame> {
-        assert!(buf.is_empty());
-        Some(pipeline::Frame::Done)
+    fn done(&mut self, buf: &mut EasyBuf) -> io::Result<Self::Out> {
+        assert!(buf.as_ref().is_empty());
+        // Ok(None)
+        unimplemented!();
     }
 }
 
 pub struct Serializer;
 
 impl Serialize for Serializer {
-    type In = Frame;
+    type In = String;
 
-    fn serialize(&mut self, frame: Frame, buf: &mut BlockBuf) {
-        use proto::pipeline::Frame::*;
-
-        match frame {
-            Message(text) => {
-                buf.write_slice(&text.as_bytes());
-                buf.write_slice(&['\n' as u8]);
-            }
-            Error(e) => {
-                let _ = write!(Fmt(buf), "[ERROR] {}\n", e);
-            }
-            MessageWithBody(..) | Body(..) => {
-                // Our Line protocol does not support streaming bodies
-                unreachable!();
-            }
-            Done => {}
+    fn serialize(&mut self, frame: String, buf: &mut Vec<u8>) {
+        for byte in frame.as_bytes() {
+            buf.push(*byte);
         }
+
+        buf.push(b'\n');
     }
 }
 
-pub type FramedLineTransport<T> = Framed<T, Parser, Serializer>;
+pub type FramedLineTransport<T> = EasyFramed<T, Parser, Serializer>;
 
 pub fn new_line_transport<T>(inner: T) -> FramedLineTransport<T>
     where T: Io,
 {
-  Framed::new(inner,
-              Parser,
-              Serializer,
-              BlockBuf::default(),
-              BlockBuf::default())
+    EasyFramed::new(inner, Parser, Serializer)
 }

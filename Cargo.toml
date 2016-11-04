@@ -5,7 +5,6 @@ authors = ["Carl Lerche <me@carllerche.com>"]
 
 [dependencies]
 log = "0.3.6"
-bytes = { git = "https://github.com/carllerche/bytes" }
 futures = "0.1"
 tokio-core = "0.1"
 tokio-proto = { git = "https://github.com/tokio-rs/tokio-proto" }
@@ -16,3 +15,6 @@ env_logger = "0.3.0"
 rand = "0.3.14"
 tokio-timer = { git = "https://github.com/tokio-rs/tokio-timer" }
 tokio-middleware = { git = "https://github.com/tokio-rs/tokio-middleware" }
+
+[replace]
+"tokio-core:0.1.0" = { git = "https://github.com/tokio-rs/tokio-core" }

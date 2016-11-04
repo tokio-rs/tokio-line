@@ -1,6 +1,5 @@
 use futures::{Async, Poll};
 use tokio::io::{Io, FramedIo};
-use proto::pipeline;
 use std::{io, mem};
 
 /// Line transport. This is a pretty bare implementation of a Transport that is chunked into
@@ -31,20 +30,13 @@ pub fn new_line_transport<T>(inner: T) -> LowLevelLineTransport<T>
     }
 }
 
-/// This defines the chunks written to our transport, i.e. the representation
-/// that the `Service` deals with. In our case, the received and sent frames
-/// are the same (Strings with io::Error as failures), however they
-/// could also be different (for example HttpRequest for In and HttpResponse
-/// for Out).
-pub type Frame = pipeline::Frame<String, (), io::Error>;
-
 /// This is a bare-metal implementation of a Transport. We define our frames to be String when
 /// reading from the wire, that is 'In' and also String when writing to the wire.
 impl<T> FramedIo for LowLevelLineTransport<T>
     where T: Io
 {
-    type In = Frame;
-    type Out = Frame;
+    type In = String;
+    type Out = Option<String>;
 
     // Our transport is ready for reading whenever our 'inner' is.
     fn poll_read(&mut self) -> Async<()> {
@@ -52,7 +44,7 @@ impl<T> FramedIo for LowLevelLineTransport<T>
     }
 
     /// Read a message from the `Transport`
-    fn read(&mut self) -> Poll<Frame, io::Error> {
+    fn read(&mut self) -> Poll<Self::Out, io::Error> {
         loop {
             // First, we check if our read buffer contains a new line - if that is the case, we
             // have one new Frame for the Service to consume. We remove the line from the input
@@ -75,7 +67,7 @@ impl<T> FramedIo for LowLevelLineTransport<T>
                     // payload and provide the sending end to the pipeline
                     // protocol dispatcher which will then proxy any body chunk
                     // frame to the Sender.
-                    .map(|s| Async::Ready(pipeline::Frame::Message(s)))
+                    .map(|s| Async::Ready(Some(s)))
                     .map_err(|_| io::Error::new(io::ErrorKind::Other, "invalid string"));
             }
 
@@ -85,7 +77,7 @@ impl<T> FramedIo for LowLevelLineTransport<T>
                 Ok(0) => {
                     // The other side hang up - this transport is all done.
                     // TODO(sirver): The use case of this is not entirely clear to me.
-                    return Ok(Async::Ready(pipeline::Frame::Done));
+                    return Ok(Async::Ready(None));
                 },
                 Ok(_) => {
                     // Some data was read. The next round in the loop will try to parse it into a
@@ -125,26 +117,21 @@ impl<T> FramedIo for LowLevelLineTransport<T>
 
     /// Write a message to the `Transport`. This turns the frame we get into a byte string and adds
     /// a newline. It then immediately gets flushed out to 'inner'.
-    fn write(&mut self, req: Frame) -> Poll<(), io::Error> {
-        match req {
-            pipeline::Frame::Message(req) => {
-                trace!("writing value; val={:?}", req);
-                // Our write buffer can only be non-empty if our 'inner' is not ready for writes.
-                // But since we signal to Tokio that our Transport is not ready when 'inner' is not
-                // ready it should never try to write to us as long as our write buffer is not
-                // empty.
-                if self.write_buffer.position() < self.write_buffer.get_ref().len() as u64 {
-                    return Err(io::Error::new(io::ErrorKind::Other, "transport has pending writes"));
-                }
-
-                let mut bytes = req.into_bytes();
-                bytes.push(b'\n');
-
-                self.write_buffer = io::Cursor::new(bytes);
-                self.flush()
-            }
-            _ => unimplemented!(),
+    fn write(&mut self, req: Self::In) -> Poll<(), io::Error> {
+        trace!("writing value; val={:?}", req);
+        // Our write buffer can only be non-empty if our 'inner' is not ready for writes.
+        // But since we signal to Tokio that our Transport is not ready when 'inner' is not
+        // ready it should never try to write to us as long as our write buffer is not
+        // empty.
+        if self.write_buffer.position() < self.write_buffer.get_ref().len() as u64 {
+            return Err(io::Error::new(io::ErrorKind::Other, "transport has pending writes"));
         }
+
+        let mut bytes = req.into_bytes();
+        bytes.push(b'\n');
+
+        self.write_buffer = io::Cursor::new(bytes);
+        self.flush()
     }
 
     /// Flush pending writes to the socket. This tries to write as much as possible of the data we
