@@ -10,9 +10,9 @@ use std::{io, mem};
 /// 1) take the bytes that arrive on our 'inner' (e.g. socket) and chunk them down into frames as
 ///    Transport::In.
 /// 2) take the frames as Transport::Out to send out and turn them into bytes. This allows for
-///    example for combining multiple frames into one TCP send.
+///    example the combining multiple frames into one TCP send.
 ///
-/// The Service only deals in The magic here is that 'inner' must implement 'Readiness' - this allows it to play with Tokio's
+/// The magic here is that 'inner' must implement 'Readiness' - this allows it to play with Tokio's
 /// reactor.
 pub struct LowLevelLineTransport<T> {
     inner: T,
@@ -48,8 +48,8 @@ impl<T> FramedIo for LowLevelLineTransport<T>
         loop {
             // First, we check if our read buffer contains a new line - if that is the case, we
             // have one new Frame for the Service to consume. We remove the line from the input
-            // buffer and this function will get called by Tokio soon again to see if there are
-            // more frames available.
+            // buffer and Tokio calls this function again soon to see if there are more frames
+            // available.
             if let Some(n) = self.read_buffer.iter().position(|b| *b == b'\n') {
                 let tail = self.read_buffer.split_off(n+1);
                 let mut line = mem::replace(&mut self.read_buffer, tail);
@@ -75,7 +75,7 @@ impl<T> FramedIo for LowLevelLineTransport<T>
             // 'inner'. 
             match self.inner.read_to_end(&mut self.read_buffer) {
                 Ok(0) => {
-                    // The other side hang up - this transport is all done.
+                    // The other side hung up - this transport is all done.
                     // TODO(sirver): The use case of this is not entirely clear to me.
                     return Ok(Async::Ready(None));
                 },
@@ -85,7 +85,7 @@ impl<T> FramedIo for LowLevelLineTransport<T>
                 }
                 Err(e) => {
                     // This would block - i.e. there is no data on the socket. We signal Tokio that
-                    // there is right now no full frame available. It will try again the next time
+                    // there is currently no full frame available. It will try again the next time
                     // our source signals readiness to read.
                     if e.kind() == io::ErrorKind::WouldBlock {
                         return Ok(Async::NotReady);
@@ -135,7 +135,7 @@ impl<T> FramedIo for LowLevelLineTransport<T>
     }
 
     /// Flush pending writes to the socket. This tries to write as much as possible of the data we
-    /// have in the write buffer to 'inner'. Since this might block - because inner is not ready,
+    /// have in the write buffer to 'inner'. Since this might block - because inner is not ready -
     /// we have to keep track of what we wrote.
     fn flush(&mut self) -> Poll<(), io::Error> {
         trace!("flushing transport");
