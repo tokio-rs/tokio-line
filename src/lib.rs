@@ -2,10 +2,10 @@
 // as combinators to manipulate the async values.
 extern crate futures;
 // The `tokio_core` crate contains the async IO runtime.
-extern crate tokio_core as tokio;
+extern crate tokio_core;
 // The `tokio_proto` crate contains the abstractions and building blocks for
 // quickly implementing a protocol client or server.
-extern crate tokio_proto as proto;
+extern crate tokio_proto;
 // The `Service` trait
 extern crate tokio_service;
 

@@ -1,10 +1,10 @@
-use futures::{Async, Poll};
-use tokio::io::{Io, FramedIo};
+use futures::{Async, AsyncSink, Poll, Stream, Sink, StartSend};
+use tokio_core::io::Io;
 use std::{io, mem};
 
 /// Line transport. This is a pretty bare implementation of a Transport that is chunked into
 /// individual lines. We have a higher level version in framed_transport.rs: It uses higher level abstractions
-/// to make the job of parsing a framed transport simpler. 
+/// to make the job of parsing a framed transport simpler.
 /// The job of a transport is twofold:
 ///
 /// 1) take the bytes that arrive on our 'inner' (e.g. socket) and chunk them down into frames as
@@ -20,7 +20,7 @@ pub struct LowLevelLineTransport<T> {
     write_buffer: io::Cursor<Vec<u8>>,
 }
 
-pub fn new_line_transport<T>(inner: T) -> LowLevelLineTransport<T> 
+pub fn new_line_transport<T>(inner: T) -> LowLevelLineTransport<T>
     where T: Io,
 {
     LowLevelLineTransport {
@@ -32,19 +32,13 @@ pub fn new_line_transport<T>(inner: T) -> LowLevelLineTransport<T>
 
 /// This is a bare-metal implementation of a Transport. We define our frames to be String when
 /// reading from the wire, that is 'In' and also String when writing to the wire.
-impl<T> FramedIo for LowLevelLineTransport<T>
+impl<T> Stream for LowLevelLineTransport<T>
     where T: Io
 {
-    type In = String;
-    type Out = Option<String>;
+    type Item = String;
+    type Error = io::Error;
 
-    // Our transport is ready for reading whenever our 'inner' is.
-    fn poll_read(&mut self) -> Async<()> {
-        self.inner.poll_read()
-    }
-
-    /// Read a message from the `Transport`
-    fn read(&mut self) -> Poll<Self::Out, io::Error> {
+    fn poll(&mut self) -> Poll<Option<String>, io::Error> {
         loop {
             // First, we check if our read buffer contains a new line - if that is the case, we
             // have one new Frame for the Service to consume. We remove the line from the input
@@ -72,7 +66,7 @@ impl<T> FramedIo for LowLevelLineTransport<T>
             }
 
             // There was no full line in the input buffer - let's see if anything is on our
-            // 'inner'. 
+            // 'inner'.
             match self.inner.read_to_end(&mut self.read_buffer) {
                 Ok(0) => {
                     // The other side hang up - this transport is all done.
@@ -97,48 +91,37 @@ impl<T> FramedIo for LowLevelLineTransport<T>
             }
         }
     }
+}
 
-    // And ready for writing whenever inner is. Below we make sure that we always write everything
-    // out to 'inner' whenever it is ready, so our writing buffer should always be empty when 'inner'
-    // is ready for writing and non-empty if it isn't.
-    fn poll_write(&mut self) -> Async<()> {
-        let is_writable = self.write_buffer.position() == self.write_buffer.get_ref().len() as u64;
-
-        if !is_writable {
-            assert!(!self.inner.poll_write().is_ready());
-        }
-
-        if is_writable {
-            Async::Ready(())
-        } else {
-            Async::NotReady
-        }
-    }
+impl<T> Sink for LowLevelLineTransport<T>
+    where T: Io
+{
+    type SinkItem = String;
+    type SinkError = io::Error;
 
     /// Write a message to the `Transport`. This turns the frame we get into a byte string and adds
     /// a newline. It then immediately gets flushed out to 'inner'.
-    fn write(&mut self, req: Self::In) -> Poll<(), io::Error> {
+    fn start_send(&mut self, req: String) -> StartSend<String, io::Error> {
         trace!("writing value; val={:?}", req);
+
         // Our write buffer can only be non-empty if our 'inner' is not ready for writes.
-        // But since we signal to Tokio that our Transport is not ready when 'inner' is not
-        // ready it should never try to write to us as long as our write buffer is not
-        // empty.
         if self.write_buffer.position() < self.write_buffer.get_ref().len() as u64 {
-            return Err(io::Error::new(io::ErrorKind::Other, "transport has pending writes"));
+            return Ok(AsyncSink::NotReady(req));
         }
 
         let mut bytes = req.into_bytes();
         bytes.push(b'\n');
 
         self.write_buffer = io::Cursor::new(bytes);
-        self.flush()
+        Ok(AsyncSink::Ready)
     }
 
     /// Flush pending writes to the socket. This tries to write as much as possible of the data we
     /// have in the write buffer to 'inner'. Since this might block - because inner is not ready,
     /// we have to keep track of what we wrote.
-    fn flush(&mut self) -> Poll<(), io::Error> {
+    fn poll_complete(&mut self) -> Poll<(), io::Error> {
         trace!("flushing transport");
+
         loop {
             // Making the borrow checker happy
             let res = {
@@ -177,5 +160,3 @@ impl<T> FramedIo for LowLevelLineTransport<T>
         }
     }
 }
-
-

@@ -1,14 +1,13 @@
-use tokio::io::Io;
-use tokio::easy::{EasyFramed, EasyBuf, Parse, Serialize};
-use futures::{Async, Poll};
+use tokio_core::io::{Io, Codec, EasyBuf, Framed};
 use std::{io, str};
 
-pub struct Parser;
+pub struct LineCodec;
 
-impl Parse for Parser {
+impl Codec for LineCodec {
+    type In = String;
     type Out = String;
 
-    fn parse(&mut self, buf: &mut EasyBuf) -> Poll<Self::Out, io::Error> {
+    fn decode(&mut self, buf: &mut EasyBuf) -> Result<Option<String>, io::Error> {
         // If our buffer contains a newline...
         if let Some(n) = buf.as_ref().iter().position(|b| *b == b'\n') {
             // remove this line and the newline from the buffer.
@@ -17,39 +16,28 @@ impl Parse for Parser {
 
             // Turn this data into a UTF string and return it in a Frame.
             return match str::from_utf8(line.as_ref()) {
-                Ok(s) => Ok(Async::Ready(s.to_string())),
+                Ok(s) => Ok(Some(s.to_string())),
                 Err(_) => Err(io::Error::new(io::ErrorKind::Other, "invalid string")),
             }
         }
 
-        Ok(Async::NotReady)
+        Ok(None)
     }
 
-    fn done(&mut self, buf: &mut EasyBuf) -> io::Result<Self::Out> {
-        assert!(buf.as_ref().is_empty());
-        // Ok(None)
-        unimplemented!();
-    }
-}
-
-pub struct Serializer;
-
-impl Serialize for Serializer {
-    type In = String;
-
-    fn serialize(&mut self, frame: String, buf: &mut Vec<u8>) {
-        for byte in frame.as_bytes() {
+    fn encode(&mut self, msg: String, buf: &mut Vec<u8>) -> io::Result<()> {
+        for byte in msg.as_bytes() {
             buf.push(*byte);
         }
 
         buf.push(b'\n');
+        Ok(())
     }
 }
 
-pub type FramedLineTransport<T> = EasyFramed<T, Parser, Serializer>;
+pub type FramedLineTransport<T> = Framed<T, LineCodec>;
 
 pub fn new_line_transport<T>(inner: T) -> FramedLineTransport<T>
     where T: Io,
 {
-    EasyFramed::new(inner, Parser, Serializer)
+    inner.framed(LineCodec)
 }
