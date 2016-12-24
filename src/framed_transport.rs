@@ -25,10 +25,7 @@ impl Codec for LineCodec {
     }
 
     fn encode(&mut self, msg: String, buf: &mut Vec<u8>) -> io::Result<()> {
-        for byte in msg.as_bytes() {
-            buf.push(*byte);
-        }
-
+        buf.extend(msg.as_bytes());
         buf.push(b'\n');
         Ok(())
     }
