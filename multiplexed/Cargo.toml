@@ -1,0 +1,15 @@
+[package]
+name = "tokio-line-multiplexed"
+version = "0.1.0"
+authors = ["Carl Lerche <me@carllerche.com>"]
+
+[dependencies]
+log = "0.3.6"
+futures = "0.1"
+byteorder = "1.0.0"
+tokio-core = "0.1"
+tokio-proto = { git = "https://github.com/tokio-rs/tokio-proto" }
+tokio-service = { git = "https://github.com/tokio-rs/tokio-service" }
+
+[dev-dependencies]
+service-fn = { git = "https://github.com/tokio-rs/service-fn" }
