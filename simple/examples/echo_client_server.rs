@@ -1,3 +1,13 @@
+//! Using tokio-proto to get a request / response oriented client and server
+//!
+//! This example illustrates how to implement a client and server for a request
+//! / response oriented protocol. The protocol is a simple line-based string
+//! protocol. Each line represents a request or response.
+//!
+//! A transport is setup to handle framing the protocl to `String` messages.
+//! Then the transport is passed to `tokio-proto` which handles the details of
+//! managing the necessary state to implemnet `Service`.
+
 extern crate tokio_line as line;
 
 extern crate futures;

@@ -39,7 +39,7 @@ pub struct Client {
 /// requests and responses cannot contain new lines. The `Validate` middleware
 /// will check the messages for new lines and error the request if one is
 /// detected.
-struct Validate<T> {
+pub struct Validate<T> {
     inner: T,
 }
 
@@ -81,6 +81,28 @@ impl Client {
 
         Box::new(ret)
     }
+
+    /// Send a `ping` to the remote. The returned future resolves when the
+    /// remote has responded with a pong.
+    ///
+    /// This function provides a bit of sugar on top of the the `Service` trait.
+    pub fn ping(&mut self) -> Box<Future<Item = (), Error = io::Error>> {
+        // The `call` response future includes the string, but since this is a
+        // "ping" request, we don't really need to include the "pong" response
+        // string.
+        let resp = self.call("[ping]".to_string())
+            .and_then(|resp| {
+                if resp != "[pong]" {
+                    Err(io::Error::new(io::ErrorKind::Other, "expected pong"))
+                } else {
+                    Ok(())
+                }
+            });
+
+        // Box the response future because we are lazy and don't want to define
+        // a new future type and `impl T` isn't stable yet...
+        Box::new(resp)
+    }
 }
 
 impl Service for Client {
@@ -92,6 +114,14 @@ impl Service for Client {
 
     fn call(&mut self, req: String) -> Self::Future {
         self.inner.call(req)
+    }
+}
+
+impl<T> Validate<T> {
+
+    /// Create a new `Validate`
+    pub fn new(inner: T) -> Validate<T> {
+        Validate { inner: inner }
     }
 }
 
