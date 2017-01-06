@@ -44,7 +44,7 @@ struct Validate<T> {
 }
 
 /// Our line-based codec
-struct LineCodec;
+pub struct LineCodec;
 
 /// Protocol definition
 struct LineProto;
