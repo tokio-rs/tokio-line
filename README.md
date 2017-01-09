@@ -5,7 +5,7 @@ Examples of how to implement simple pipelined and multiplexed protocols using
 
 ## Getting Started
 
-Clone this repo, then `cd` into either `multiplexed` or `simple`. Then, run the
+Clone this repo, then `cd` into `simple`. Then, run the
 following command:
 
 ```

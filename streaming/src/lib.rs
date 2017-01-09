@@ -128,7 +128,7 @@ impl Service for Client {
     // For simplicity, box the future.
     type Future = Box<Future<Item = Line, Error = io::Error>>;
 
-    fn call(&mut self, req: Line) -> Self::Future {
+    fn call(&self, req: Line) -> Self::Future {
         self.inner.call(req)
     }
 }
@@ -178,7 +178,7 @@ impl<T> Service for ServerTypeMap<T>
     type Error = io::Error;
     type Future = Box<Future<Item = LineMessage, Error = io::Error>>;
 
-    fn call(&mut self, req: LineMessage) -> Self::Future {
+    fn call(&self, req: LineMessage) -> Self::Future {
         Box::new(self.inner.call(req.into())
                  .map(LineMessage::from))
     }
@@ -214,7 +214,7 @@ impl<T> Service for ClientTypeMap<T>
     type Error = io::Error;
     type Future = Box<Future<Item = Line, Error = io::Error>>;
 
-    fn call(&mut self, req: Line) -> Self::Future {
+    fn call(&self, req: Line) -> Self::Future {
         Box::new(self.inner.call(req.into())
                  .map(Line::from))
     }

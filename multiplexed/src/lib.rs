@@ -94,7 +94,7 @@ impl Service for Client {
     // For simplicity, box the future.
     type Future = Box<Future<Item = String, Error = io::Error>>;
 
-    fn call(&mut self, req: String) -> Self::Future {
+    fn call(&self, req: String) -> Self::Future {
         self.inner.call(req)
     }
 }
@@ -109,7 +109,7 @@ impl<T> Service for Validate<T>
     // For simplicity, box the future.
     type Future = Box<Future<Item = String, Error = io::Error>>;
 
-    fn call(&mut self, req: String) -> Self::Future {
+    fn call(&self, req: String) -> Self::Future {
         // Make sure that the request does not include any new lines
         if req.chars().find(|&c| c == '\n').is_some() {
             let err = io::Error::new(io::ErrorKind::InvalidInput, "message contained new line");

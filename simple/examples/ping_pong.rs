@@ -179,7 +179,7 @@ pub fn main() {
 
     core.run(
         line::Client::connect(&addr, &handle)
-            .and_then(|mut client| {
+            .and_then(|client| {
                 // Start with a ping
                 client.ping()
                     .and_then(move |_| {

@@ -86,7 +86,7 @@ impl Client {
     /// remote has responded with a pong.
     ///
     /// This function provides a bit of sugar on top of the the `Service` trait.
-    pub fn ping(&mut self) -> Box<Future<Item = (), Error = io::Error>> {
+    pub fn ping(&self) -> Box<Future<Item = (), Error = io::Error>> {
         // The `call` response future includes the string, but since this is a
         // "ping" request, we don't really need to include the "pong" response
         // string.
@@ -112,7 +112,7 @@ impl Service for Client {
     // For simplicity, box the future.
     type Future = Box<Future<Item = String, Error = io::Error>>;
 
-    fn call(&mut self, req: String) -> Self::Future {
+    fn call(&self, req: String) -> Self::Future {
         self.inner.call(req)
     }
 }
@@ -135,7 +135,7 @@ impl<T> Service for Validate<T>
     // For simplicity, box the future.
     type Future = Box<Future<Item = String, Error = io::Error>>;
 
-    fn call(&mut self, req: String) -> Self::Future {
+    fn call(&self, req: String) -> Self::Future {
         // Make sure that the request does not include any new lines
         if req.chars().find(|&c| c == '\n').is_some() {
             let err = io::Error::new(io::ErrorKind::InvalidInput, "message contained new line");

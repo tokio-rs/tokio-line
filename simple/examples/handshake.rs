@@ -178,7 +178,7 @@ pub fn main() {
 
     core.run(
         client
-            .and_then(|mut client| {
+            .and_then(|client| {
                 client.call("Goodbye".to_string())
                     .and_then(|response| {
                         println!("CLIENT: {:?}", response);
