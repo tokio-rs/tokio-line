@@ -5,7 +5,7 @@
 //! is being streamed. All subsequent lines are the streaming body until another
 //! empty line is reached.
 
-// #![deny(warnings, missing_docs)]
+#![deny(warnings, missing_docs)]
 
 extern crate futures;
 extern crate tokio_core;
@@ -39,18 +39,29 @@ pub struct Client {
     inner: ClientTypeMap<ClientProxy<LineMessage, LineMessage, io::Error>>,
 }
 
+/// The request and response type for the streaming line-based service.
+///
+/// A message is either "oneshot" and includes the full line, or it is streaming
+/// and the line is broken up into chunks.
 #[derive(Debug)]
 pub enum Line {
+    /// The full line
     Once(String),
+    /// A stream of line chunks
     Stream(LineStream),
 }
 
+/// A stream of line chunks.
+///
+/// We defined a custom type that wraps `tokio_proto::streaming::Body` in order
+/// to keep tokio-proto as an implementation detail.
 #[derive(Debug)]
 pub struct LineStream {
     inner: Body<String, io::Error>,
 }
 
 impl LineStream {
+    /// Returns a `LineStream` with its sender half.
     pub fn pair() -> (mpsc::Sender<Result<String, io::Error>>, LineStream) {
         let (tx, rx) = Body::pair();
         (tx, LineStream { inner: rx })
@@ -70,11 +81,12 @@ impl Stream for LineStream {
 /// this and instead expose a custom message type
 type LineMessage = Message<String, Body<String, io::Error>>;
 
-/// Maps types between Line <-> LineMessage for the server
+/// Maps types between Line <-> LineMessage for the server service
 struct ServerTypeMap<T> {
     inner: T,
 }
 
+/// Maps types between Line <-> LineMessage for the client service
 struct ClientTypeMap<T> {
     inner: T,
 }
@@ -113,6 +125,8 @@ impl Client {
         let ret = TcpClient::new(LineProto)
             .connect(addr, handle)
             .map(|client_proxy| {
+                // Wrap the returned client handle with our `ClientTypeMap`
+                // service middleware
                 let type_map = ClientTypeMap { inner: client_proxy };
                 Client { inner: type_map }
             });
