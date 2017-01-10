@@ -207,7 +207,6 @@ impl Codec for LineCodec {
 impl<T: Io + 'static> ClientProto<T> for LineProto {
     type Request = String;
     type Response = String;
-    type Error = io::Error;
 
     /// `Framed<T, LineCodec>` is the return value of `io.framed(LineCodec)`
     type Transport = Framed<T, LineCodec>;
@@ -221,7 +220,6 @@ impl<T: Io + 'static> ClientProto<T> for LineProto {
 impl<T: Io + 'static> ServerProto<T> for LineProto {
     type Request = String;
     type Response = String;
-    type Error = io::Error;
 
     /// `Framed<T, LineCodec>` is the return value of `io.framed(LineCodec)`
     type Transport = Framed<T, LineCodec>;

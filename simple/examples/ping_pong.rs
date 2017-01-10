@@ -140,7 +140,6 @@ pub fn serve<T>(addr: SocketAddr, new_service: T)
 impl<T: Io + 'static> ServerProto<T> for LineProto {
     type Request = String;
     type Response = String;
-    type Error = io::Error;
 
     /// `Framed<T, LineCodec>` is the return value of `io.framed(LineCodec)`
     type Transport = PingPong<Framed<T, line::LineCodec>>;

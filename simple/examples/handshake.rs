@@ -62,7 +62,6 @@ pub fn serve<T>(addr: SocketAddr, new_service: T)
 impl<T: Io + 'static> ServerProto<T> for ServerLineProto {
     type Request = String;
     type Response = String;
-    type Error = io::Error;
 
     /// `Framed<T, LineCodec>` is the return value of `io.framed(LineCodec)`
     type Transport = Framed<T, line::LineCodec>;
@@ -103,7 +102,6 @@ impl<T: Io + 'static> ServerProto<T> for ServerLineProto {
 impl<T: Io + 'static> ClientProto<T> for ClientLineProto {
     type Request = String;
     type Response = String;
-    type Error = io::Error;
 
     /// `Framed<T, LineCodec>` is the return value of `io.framed(LineCodec)`
     type Transport = Framed<T, line::LineCodec>;
