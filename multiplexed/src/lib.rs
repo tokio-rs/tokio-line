@@ -196,8 +196,8 @@ impl Codec for LineCodec {
         let mut encoded_request_id = [0; 4];
         BigEndian::write_u32(&mut encoded_request_id, request_id as u32);
 
-        buf.extend_from_slice(&encoded_request_id);
-        buf.extend_from_slice(msg.as_bytes());
+        buf.extend(&encoded_request_id);
+        buf.extend(msg.as_bytes());
         buf.push(b'\n');
 
         Ok(())

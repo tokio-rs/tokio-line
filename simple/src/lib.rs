@@ -196,7 +196,7 @@ impl Codec for LineCodec {
     }
 
     fn encode(&mut self, msg: String, buf: &mut Vec<u8>) -> io::Result<()> {
-        buf.extend_from_slice(msg.as_bytes());
+        buf.extend(msg.as_bytes());
         buf.push(b'\n');
 
         Ok(())
