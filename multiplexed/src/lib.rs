@@ -218,6 +218,7 @@ impl Encoder for LineCodec {
 impl<T: AsyncRead + AsyncWrite + 'static> ClientProto<T> for LineProto {
     type Request = String;
     type Response = String;
+    type RequestId = u64;
 
     /// `Framed<T, LineCodec>` is the return value of `io.framed(LineCodec)`
     type Transport = Framed<T, LineCodec>;
@@ -231,6 +232,7 @@ impl<T: AsyncRead + AsyncWrite + 'static> ClientProto<T> for LineProto {
 impl<T: AsyncRead + AsyncWrite + 'static> ServerProto<T> for LineProto {
     type Request = String;
     type Response = String;
+    type RequestId = u64;
 
     /// `Framed<T, LineCodec>` is the return value of `io.framed(LineCodec)`
     type Transport = Framed<T, LineCodec>;
