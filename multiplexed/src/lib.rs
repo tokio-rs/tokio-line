@@ -17,7 +17,7 @@ use tokio_io::codec::{Encoder, Decoder, Framed};
 use tokio_core::net::TcpStream;
 use tokio_core::reactor::Handle;
 use tokio_proto::{TcpClient, TcpServer};
-use tokio_proto::multiplex::{RequestId, ServerProto, ClientProto, ClientService};
+use tokio_proto::multiplex::{ServerProto, ClientProto, ClientService};
 use tokio_service::{Service, NewService};
 
 use bytes::{BytesMut, Buf, BufMut, BigEndian};
@@ -163,10 +163,10 @@ impl<T> NewService for Validate<T>
 /// +----------------+------------------------------+
 ///
 impl Decoder for LineCodec {
-    type Item = (RequestId, String);
+    type Item = (u64, String);
     type Error = io::Error;
 
-    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<(RequestId, String)>, io::Error> {
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<(u64, String)>, io::Error> {
         // At least 5 bytes are required for a frame: 4 byte head + one byte
         // '\n'
         if buf.len() < 5 {
@@ -183,11 +183,11 @@ impl Decoder for LineCodec {
             buf.split_to(1);
 
             // Deserialize the request ID
-            let request_id = io::Cursor::new(&line[0..4]).get_u32::<BigEndian>();
+            let request_id = io::Cursor::new(&line[0..4]).get_u32::<BigEndian>() as u64;
 
             // Turn this data into a UTF string and return it in a Frame.
             return match str::from_utf8(&line.as_ref()[4..]) {
-                Ok(s) => Ok(Some((request_id as RequestId, s.to_string()))),
+                Ok(s) => Ok(Some((request_id, s.to_string()))),
                 Err(_) => Err(io::Error::new(io::ErrorKind::Other, "invalid string")),
             }
         }
@@ -197,10 +197,10 @@ impl Decoder for LineCodec {
 }
 
 impl Encoder for LineCodec {
-    type Item = (RequestId, String);
+    type Item = (u64, String);
     type Error = io::Error;
 
-    fn encode(&mut self, msg: (RequestId, String), buf: &mut BytesMut) -> io::Result<()> {
+    fn encode(&mut self, msg: (u64, String), buf: &mut BytesMut) -> io::Result<()> {
         // Reserve enough space for the frame
         let len = 4 + buf.len() + 1;
         buf.reserve(len);
