@@ -8,19 +8,26 @@
 #![deny(warnings, missing_docs)]
 
 extern crate futures;
+extern crate tokio_io;
 extern crate tokio_core;
 extern crate tokio_proto;
 extern crate tokio_service;
+extern crate bytes;
 
 use futures::{Future, Stream, Poll};
 use futures::sync::mpsc;
-use tokio_core::io::{Io, Codec, EasyBuf, Framed};
+
+use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_io::codec::{Encoder, Decoder, Framed};
 use tokio_core::reactor::Handle;
 use tokio_proto::{TcpClient, TcpServer};
 use tokio_proto::streaming::{Body, Message};
 use tokio_proto::streaming::pipeline::{Frame, ServerProto, ClientProto};
 use tokio_proto::util::client_proxy::ClientProxy;
 use tokio_service::{Service, NewService};
+
+use bytes::{BytesMut, BufMut};
+
 use std::{io, str};
 use std::net::SocketAddr;
 
@@ -237,18 +244,19 @@ impl<T> Service for ClientTypeMap<T>
 /// Implementation of the simple line-based protocol.
 ///
 /// Frames consist of a UTF-8 encoded string, terminated by a '\n' character.
-impl Codec for LineCodec {
-    type In = Frame<String, String, io::Error>;
-    type Out = Frame<String, String, io::Error>;
+impl Decoder for LineCodec {
+    type Item = Frame<String, String, io::Error>;
+    type Error = io::Error;
 
-    fn decode(&mut self, buf: &mut EasyBuf) -> Result<Option<Self::In>, io::Error> {
+
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, io::Error> {
         // Check to see if the frame contains a new line
         if let Some(n) = buf.as_ref().iter().position(|b| *b == b'\n') {
             // remove the serialized frame from the buffer.
-            let line = buf.drain_to(n);
+            let line = buf.split_to(n);
 
             // Also remove the '\n'
-            buf.drain_to(1);
+            buf.split_to(1);
 
             // Turn this data into a UTF string and return it in a Frame.
             return match str::from_utf8(&line.as_ref()) {
@@ -296,18 +304,26 @@ impl Codec for LineCodec {
 
         Ok(None)
     }
+}
 
-    fn encode(&mut self, msg: Self::Out, buf: &mut Vec<u8>) -> io::Result<()> {
+impl Encoder for LineCodec {
+    type Item = Frame<String, String, io::Error>;
+    type Error = io::Error;
+
+
+    fn encode(&mut self, msg: Self::Item, buf: &mut BytesMut) -> io::Result<()> {
         match msg {
             Frame::Message { message, body } => {
                 // Our protocol dictates that a message head that includes a
                 // streaming body is an empty string.
                 assert!(message.is_empty() == body);
 
+                buf.reserve(message.len());
                 buf.extend(message.as_bytes());
             }
             Frame::Body { chunk } => {
                 if let Some(chunk) = chunk {
+                    buf.reserve(chunk.len());
                     buf.extend(chunk.as_bytes());
                 }
             }
@@ -319,13 +335,13 @@ impl Codec for LineCodec {
         }
 
         // Push the new line
-        buf.push(b'\n');
+        buf.put_u8(b'\n');
 
         Ok(())
     }
 }
 
-impl<T: Io + 'static> ClientProto<T> for LineProto {
+impl<T: AsyncRead + AsyncWrite + 'static> ClientProto<T> for LineProto {
     type Request = String;
     type RequestBody = String;
     type Response = String;
@@ -345,7 +361,7 @@ impl<T: Io + 'static> ClientProto<T> for LineProto {
     }
 }
 
-impl<T: Io + 'static> ServerProto<T> for LineProto {
+impl<T: AsyncRead + AsyncWrite + 'static> ServerProto<T> for LineProto {
     type Request = String;
     type RequestBody = String;
     type Response = String;

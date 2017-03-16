@@ -3,17 +3,24 @@
 #![deny(warnings, missing_docs)]
 
 extern crate futures;
+extern crate tokio_io;
 extern crate tokio_core;
 extern crate tokio_proto;
 extern crate tokio_service;
+extern crate bytes;
 
 use futures::{future, Future};
-use tokio_core::io::{Io, Codec, EasyBuf, Framed};
+
+use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_io::codec::{Framed, Encoder, Decoder};
 use tokio_core::net::TcpStream;
 use tokio_core::reactor::Handle;
 use tokio_proto::{TcpClient, TcpServer};
 use tokio_proto::pipeline::{ServerProto, ClientProto, ClientService};
 use tokio_service::{Service, NewService};
+
+use bytes::{BytesMut, BufMut};
+
 use std::{io, str};
 use std::net::SocketAddr;
 
@@ -172,18 +179,18 @@ impl<T> NewService for Validate<T>
 /// Implementation of the simple line-based protocol.
 ///
 /// Frames consist of a UTF-8 encoded string, terminated by a '\n' character.
-impl Codec for LineCodec {
-    type In = String;
-    type Out = String;
+impl Decoder for LineCodec {
+    type Item = String;
+    type Error = io::Error;
 
-    fn decode(&mut self, buf: &mut EasyBuf) -> Result<Option<String>, io::Error> {
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<String>, io::Error> {
         // Check to see if the frame contains a new line
         if let Some(n) = buf.as_ref().iter().position(|b| *b == b'\n') {
             // remove the serialized frame from the buffer.
-            let line = buf.drain_to(n);
+            let line = buf.split_to(n);
 
             // Also remove the '\n'
-            buf.drain_to(1);
+            buf.split_to(1);
 
             // Turn this data into a UTF string and return it in a Frame.
             return match str::from_utf8(&line.as_ref()) {
@@ -194,16 +201,24 @@ impl Codec for LineCodec {
 
         Ok(None)
     }
+}
 
-    fn encode(&mut self, msg: String, buf: &mut Vec<u8>) -> io::Result<()> {
+impl Encoder for LineCodec {
+    type Item = String;
+    type Error = io::Error;
+
+    fn encode(&mut self, msg: String, buf: &mut BytesMut) -> io::Result<()> {
+        // Reserve enough space for the line
+        buf.reserve(msg.len() + 1);
+
         buf.extend(msg.as_bytes());
-        buf.push(b'\n');
+        buf.put_u8(b'\n');
 
         Ok(())
     }
 }
 
-impl<T: Io + 'static> ClientProto<T> for LineProto {
+impl<T: AsyncRead + AsyncWrite + 'static> ClientProto<T> for LineProto {
     type Request = String;
     type Response = String;
 
@@ -216,7 +231,7 @@ impl<T: Io + 'static> ClientProto<T> for LineProto {
     }
 }
 
-impl<T: Io + 'static> ServerProto<T> for LineProto {
+impl<T: AsyncRead + AsyncWrite + 'static> ServerProto<T> for LineProto {
     type Request = String;
     type Response = String;
 

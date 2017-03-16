@@ -4,19 +4,24 @@
 #![deny(warnings, missing_docs)]
 
 extern crate futures;
+extern crate tokio_io;
 extern crate tokio_core;
 extern crate tokio_proto;
 extern crate tokio_service;
-extern crate byteorder;
+extern crate bytes;
 
 use futures::{future, Future};
-use tokio_core::io::{Io, Codec, EasyBuf, Framed};
+
+use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_io::codec::{Encoder, Decoder, Framed};
 use tokio_core::net::TcpStream;
 use tokio_core::reactor::Handle;
 use tokio_proto::{TcpClient, TcpServer};
 use tokio_proto::multiplex::{RequestId, ServerProto, ClientProto, ClientService};
 use tokio_service::{Service, NewService};
-use byteorder::{BigEndian, ByteOrder};
+
+use bytes::{BytesMut, Buf, BufMut, BigEndian};
+
 use std::{io, str};
 use std::net::SocketAddr;
 
@@ -157,11 +162,11 @@ impl<T> NewService for Validate<T>
 /// |                |                              |
 /// +----------------+------------------------------+
 ///
-impl Codec for LineCodec {
-    type In = (RequestId, String);
-    type Out = (RequestId, String);
+impl Decoder for LineCodec {
+    type Item = (RequestId, String);
+    type Error = io::Error;
 
-    fn decode(&mut self, buf: &mut EasyBuf) -> Result<Option<(RequestId, String)>, io::Error> {
+    fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<(RequestId, String)>, io::Error> {
         // At least 5 bytes are required for a frame: 4 byte head + one byte
         // '\n'
         if buf.len() < 5 {
@@ -172,13 +177,13 @@ impl Codec for LineCodec {
         // bytes which is the request ID
         if let Some(n) = buf.as_ref()[4..].iter().position(|b| *b == b'\n') {
             // remove the serialized frame from the buffer.
-            let line = buf.drain_to(n + 4);
+            let line = buf.split_to(n + 4);
 
             // Also remove the '\n'
-            buf.drain_to(1);
+            buf.split_to(1);
 
             // Deserialize the request ID
-            let request_id = BigEndian::read_u32(&line.as_ref()[0..4]);
+            let request_id = io::Cursor::new(&line[0..4]).get_u32::<BigEndian>();
 
             // Turn this data into a UTF string and return it in a Frame.
             return match str::from_utf8(&line.as_ref()[4..]) {
@@ -189,22 +194,28 @@ impl Codec for LineCodec {
 
         Ok(None)
     }
+}
 
-    fn encode(&mut self, msg: (RequestId, String), buf: &mut Vec<u8>) -> io::Result<()> {
+impl Encoder for LineCodec {
+    type Item = (RequestId, String);
+    type Error = io::Error;
+
+    fn encode(&mut self, msg: (RequestId, String), buf: &mut BytesMut) -> io::Result<()> {
+        // Reserve enough space for the frame
+        let len = 4 + buf.len() + 1;
+        buf.reserve(len);
+
         let (request_id, msg) = msg;
 
-        let mut encoded_request_id = [0; 4];
-        BigEndian::write_u32(&mut encoded_request_id, request_id as u32);
-
-        buf.extend(&encoded_request_id);
-        buf.extend(msg.as_bytes());
-        buf.push(b'\n');
+        buf.put_u32::<BigEndian>(request_id as u32);
+        buf.put_slice(msg.as_bytes());
+        buf.put_u8(b'\n');
 
         Ok(())
     }
 }
 
-impl<T: Io + 'static> ClientProto<T> for LineProto {
+impl<T: AsyncRead + AsyncWrite + 'static> ClientProto<T> for LineProto {
     type Request = String;
     type Response = String;
 
@@ -217,7 +228,7 @@ impl<T: Io + 'static> ClientProto<T> for LineProto {
     }
 }
 
-impl<T: Io + 'static> ServerProto<T> for LineProto {
+impl<T: AsyncRead + AsyncWrite + 'static> ServerProto<T> for LineProto {
     type Request = String;
     type Response = String;
 

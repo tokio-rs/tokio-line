@@ -10,13 +10,14 @@
 extern crate tokio_line;
 
 extern crate futures;
+extern crate tokio_io;
 extern crate tokio_core;
 
 use tokio_line::LineCodec;
 
 use futures::{stream, Future, Stream, Sink};
 
-use tokio_core::io::Io;
+use tokio_io::AsyncRead;
 use tokio_core::net::{TcpStream, TcpListener};
 use tokio_core::reactor::Core;
 

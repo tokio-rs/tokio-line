@@ -16,6 +16,7 @@ extern crate tokio_line as line;
 
 #[macro_use]
 extern crate futures;
+extern crate tokio_io;
 extern crate tokio_core;
 extern crate tokio_proto;
 extern crate tokio_service;
@@ -24,15 +25,15 @@ extern crate service_fn;
 use futures::future;
 use futures::{Future, Stream, Sink};
 
-use tokio_core::io::{Framed, Io};
+use tokio_io::{AsyncRead, AsyncWrite};
+use tokio_io::codec::Framed;
 use tokio_core::reactor::Core;
-
 use tokio_proto::{TcpClient, TcpServer};
 use tokio_proto::pipeline::{ClientProto, ServerProto};
-
 use tokio_service::{Service, NewService};
 
 use service_fn::service_fn;
+
 use std::{io, thread};
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -59,7 +60,7 @@ pub fn serve<T>(addr: SocketAddr, new_service: T)
         .serve(new_service);
 }
 
-impl<T: Io + 'static> ServerProto<T> for ServerLineProto {
+impl<T: AsyncRead + AsyncWrite + 'static> ServerProto<T> for ServerLineProto {
     type Request = String;
     type Response = String;
 
@@ -99,7 +100,7 @@ impl<T: Io + 'static> ServerProto<T> for ServerLineProto {
     }
 }
 
-impl<T: Io + 'static> ClientProto<T> for ClientLineProto {
+impl<T: AsyncRead + AsyncWrite + 'static> ClientProto<T> for ClientLineProto {
     type Request = String;
     type Response = String;
 

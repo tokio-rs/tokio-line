@@ -63,7 +63,7 @@ pub fn main() {
 
     core.run(
         Client::connect(&addr, &handle)
-            .and_then(|mut client| {
+            .and_then(|client| {
                 client.call(Line::Once("Hello".to_string()))
                     .and_then(move |response| {
                         println!("CLIENT: {:?}", response);
