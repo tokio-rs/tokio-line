@@ -202,7 +202,7 @@ impl Encoder for LineCodec {
 
     fn encode(&mut self, msg: (RequestId, String), buf: &mut BytesMut) -> io::Result<()> {
         // Reserve enough space for the frame
-        let len = 4 + buf.len() + 1;
+        let len = 4 + msg.1.len() + 1;
         buf.reserve(len);
 
         let (request_id, msg) = msg;
